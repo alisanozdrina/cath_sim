@@ -1,5 +1,6 @@
 import numpy as np
 from NuRadioReco.detector import detector
+from NuRadioReco.detector import antennapattern
 import json
 import numpy as np
 from radiotools import helper as hp
@@ -48,20 +49,29 @@ class Ara1Detector:
         f.close()
         return ch_coord
 
-    def getAntOrientationRotation(self):
+    def getAntOrientationRotation(self,ch_id=0):
 
-        ch_ori = np.zeros((len(self._deep_ch_num), 4))
+        #ch_ori = np.zeros((len(self._deep_ch_num), 4))
+        #
+        # f = open(self._pathToJson)
+        # data = json.load(f)
+        #
+        # for i,ch in enumerate(self._deep_ch_num): # self._deep_ch_num
+        #     ch_ori[i] = np.array( [data['channels'][str(ch)]['ant_orientation_theta'],
+        #                           data['channels'][str(ch)]['ant_orientation_phi'],
+        #                           data['channels'][str(ch)]['ant_rotation_theta'],
+        #                           data['channels'][str(ch)]['ant_rotation_phi']])
+        # f.close()
+        # return ch_ori
 
-        f = open(self._pathToJson)
-        data = json.load(f)
+        if ch_id < 8:
+            ch_ori = np.array([0, 0, np.pi / 2, 0])
+            return ch_ori
+        else:
+            ch_ori = np.array([0, 0, np.pi / 2, np.pi / 2])
+            return ch_ori
 
-        for i,ch in enumerate(self._deep_ch_num): # self._deep_ch_num
-            ch_ori[i] = np.array( [data['channels'][str(ch)]['ant_orientation_theta'],
-                                  data['channels'][str(ch)]['ant_orientation_phi'],
-                                  data['channels'][str(ch)]['ant_rotation_theta'],
-                                  data['channels'][str(ch)]['ant_rotation_phi']])
-        f.close()
-        return ch_ori
+
 
     def getDistance_InIceAnt(self):
 

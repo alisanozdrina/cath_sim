@@ -9,6 +9,8 @@ from NuRadioMC.utilities import medium
 from NuRadioReco.utilities import units
 
 import scipy.constants
+from scipy.signal import butter, lfilter
+
 from NuRadioReco.utilities import units, fft
 from radiotools import helper as hp
 from scipy import constants
@@ -418,17 +420,45 @@ def drawTraceDeepChannels(station_name, event_id, traceVoltage, trace_sampling_r
 
     plt.show()
 
-def superimposeWF(WF, delta_t):
+def superimposeWF(WF, t_shift, sampling_rate=3.2):
+    # trace_base = np.zeros(2048)
+    # for n in range(0, len(WF)):
+    #     trace = WF[n]
+    #     shift = delta_t[n]
+    #     for i in range(0, len(trace)):
+    #         it = int(shift+i)
+    #         if (it >= len(trace_base)):
+    #             #time window is to small, cut the trace
+    #             break
+    #         else:
+    #             trace_base[it] += trace[i]
+    # return trace_base
     trace_base = np.zeros(2048)
-    for n in range(0, len(WF)):
-        trace = WF[n]
-        shift = delta_t[n]  
-        for i in range(0, len(trace)):
-            it = int(shift+i)
-            if (it >= len(trace_base)):
-                #time window is to small, cut the trace
-                break 
-            else:
-                trace_base[it] += trace[i]
+    shift_inSamples = int(t_shift*sampling_rate)
+    for i in range(0, len(WF[0])):
+        trace_base[i] +=  WF[0][i]
+
+    for i in range(0, len(WF[1])):
+        it = int(shift_inSamples+i)
+        if (it >= len(trace_base)):
+            #time window is too small, cut the trace
+            break
+        else:
+            trace_base[it] += WF[1][i]
     return trace_base
 
+def shift_trace(WF, delta_t, sampling_rate):
+    WF_shifted = np.zeros(len(WF))
+    shift_inSamples = int(delta_t*sampling_rate)
+    if shift_inSamples < len(WF):
+        for i in range(0, len(WF)-shift_inSamples):
+            WF_shifted[i+shift_inSamples] = WF[i]
+    return WF_shifted
+
+def butter_bandpass(lowcut, highcut, fs, order=5):
+    return butter(order, [lowcut, highcut], fs=fs, btype='band')
+
+def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
+    b, a = butter_bandpass(lowcut, highcut, fs, order=order)
+    y = lfilter(b, a, data)
+    return y
