@@ -21,6 +21,8 @@ from NuRadioReco.detector import detector
 from NuRadioReco.utilities import geometryUtilities as geo_utl
 import datetime
 
+import pandas as pd
+
 from IceCube_gen2_radio.IC_hybrid_station import *
 import matplotlib.lines
 
@@ -452,6 +454,8 @@ def shift_trace(WF, delta_t, sampling_rate):
     shift_inSamples = int(delta_t*sampling_rate)
     if shift_inSamples < len(WF):
         for i in range(0, len(WF)-shift_inSamples):
+            if i >= 2047:
+                print('default time is too big! channel is delayed! ')
             WF_shifted[i+shift_inSamples] = WF[i]
     return WF_shifted
 
@@ -462,3 +466,4 @@ def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
     b, a = butter_bandpass(lowcut, highcut, fs, order=order)
     y = lfilter(b, a, data)
     return y
+

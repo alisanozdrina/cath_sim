@@ -11,8 +11,11 @@ from radiotools import helper as hp
 
 import numpy as np
 from scipy import constants
+from scipy.signal import find_peaks,peak_widths,peak_prominences
+
 import matplotlib.pyplot as plt
 
+import pandas as pd
 
 #################
 # A1 coordinates taken from https://aradocs.wipac.wisc.edu/0019/001993/001/SPS_ARA_Hot_WaterDrill_Power_Distribution_As_Built-Rev2.pdf
@@ -56,7 +59,7 @@ for ch_id in range(0,8):
     n = rays.get_number_of_solutions()
 
     WF = [np.array([]) for i in range(n)]
-    default_trigger_time = 9800 # pick arbitary triggering time for plotting
+    default_trigger_time = 9700 # pick arbitary triggering time for plotting
 
     dt_channel = 0
     dt_DnR = 0
@@ -118,12 +121,30 @@ num_of_samples_per_trace = 2048
 maxT = int( num_of_samples_per_trace / (sampling_rate_ara1))
 step = maxT / num_of_samples_per_trace
 time_axis = np.arange(0, maxT, step)
+dt_DnR_sim = np.zeros(8)
 
 #x,y row, column
 for ch_id in range(0,8):
     y = ch_id % 4
     x = (ch_id)//4
-    axs[x, y].plot(time_axis, Event.get_trace(ch_id))
-    axs[x, y].set_title('ch' + str(ch_id) )
+    peaks, peakProp = find_peaks(Event.get_trace(ch_id), 1e-13, distance=100)
+    dt_DnR_sim[ch_id] = (peaks[1] - peaks[0]) * step
+   # axs[x, y].plot(time_axis,Event.get_trace(ch_id))
+   # axs[x, y].set_title('ch' + str(ch_id) )
+
+#plt.show()
+
+# compare with the spice core data
+fig, axs = plt.subplots(2, 4)
+dt=pd.read_csv('/Users/alisanozdrina/Documents/phys/exp/ara/ara2_ml/dev/dt_DnR.csv')
+for ch_id in range(0,8):
+    y = ch_id % 4
+    x = (ch_id)//4
+    dt.iloc[ch_id]
+    axs[x, y].hist( dt.iloc[ch_id] [dt.iloc[ch_id] > 100 ] )
+    axs[x, y].axvline(dt_DnR_sim[ch_id], color='k', linestyle='dashed', linewidth=1)
+    min_ylim, max_ylim = axs[x, y].get_ylim()
+    plt.text(dt_DnR_sim[ch_id] * 1.1, max_ylim * 0.9, 'sim'.format(dt_DnR_sim[ch_id]))
+    axs[x, y].set_title('ch' + str(ch_id))
 
 plt.show()
