@@ -1,13 +1,13 @@
 from unittest import TestCase
 import numpy as np
-from Ara1Detector import Ara1Detector
-class TestAra1Detector(TestCase):
+from AraDetector import AraDetector
+class TestAraDetector(TestCase):
     def setUp(self):
-        self.ara = Ara1Detector()
-class TestDetectorInit(TestAra1Detector):
+        self.ara = AraDetector()
+class TestDetectorInit(TestAraDetector):
     def test_get_ant_coordinate(self):
-        self.assertEqual(self.ara.getAntCoordinate()[0][0], 8.45158 + self.ara._coordinates[0])
-        self.assertEqual(len(self.ara.getAntCoordinate()), 16)
+        self.assertEqual(self.ara.getAntCoordinate[0][0], 8.45158 + self.ara._coordinates[0])
+        self.assertEqual(len(self.ara.getAntCoordinate), 16)
 
     def test_get_ant_angles(self):
         self.assertEqual(self.ara.getAntOrientationRotation()[0][0], 0)
