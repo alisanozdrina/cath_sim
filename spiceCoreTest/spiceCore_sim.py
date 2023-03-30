@@ -12,7 +12,7 @@ from radiotools import helper as hp
 import numpy as np
 from scipy import constants
 from scipy.signal import find_peaks,peak_widths,peak_prominences
-
+from NuRadioReco.detector.ARA.analog_components import get_system_response
 import matplotlib.pyplot as plt
 
 import pandas as pd
@@ -40,9 +40,9 @@ rays = prop(ice, attenuation_model,
 
 
 # Initialize ARA detector, Spice Core transmitter
-Tx_location = np.array([14883.994, 12940.284, -1100])
+Tx_location = np.array([1062.08216737, -2107.26320548,    12.15159203 -1100])
 
-ara2 = AraDetector(coordinates=np.array([13832.434, 10828.934, 0]), st_id = 2)
+ara2 = AraDetector(coordinates=np.array([0, 0, 0]), st_id = 2)
 ara2.set_tx_coordinates(Tx_location)
 sampling_rate_ara1 = 3.2
 
@@ -108,7 +108,9 @@ for ch_id in range(0,8):
 
             pwr_spectrum_rx = np.sum(pwr_spectrum_rx, axis=0) * attenuation_ice
 
-
+            system_response = get_system_response(freq_range)
+            system_response = system_response['gain'] * system_response['phase']
+            pwr_spectrum_rx *= system_response
             # here go antenna - DAQ amplification chain..
 
             WF[i_solution] = fft.freq2time(pwr_spectrum_rx, 2*np.max(freq_range))
@@ -128,29 +130,67 @@ maxT = int( num_of_samples_per_trace / (sampling_rate_ara1))
 step = maxT / num_of_samples_per_trace
 time_axis = np.arange(0, maxT, step)
 dt_DnR_sim = np.zeros(8)
+dt_ch_top_sim = np.zeros(4)
+dt_ch_b_sim = np.zeros(4)
 
 #x,y row, column
 for ch_id in range(0,8):
     y = ch_id % 4
     x = (ch_id)//4
- #   peaks, peakProp = find_peaks(Event.get_trace(ch_id), 1e-13, distance=100)
- #   dt_DnR_sim[ch_id] = (peaks[1] - peaks[0]) * step
+    peaks= find_peak_start(Event.get_trace(ch_id), 0.25e-10, distance=100)
+    dt_DnR_sim[ch_id] = (peaks[1] - peaks[0]) * step
+
     axs[x, y].plot(time_axis,Event.get_trace(ch_id))
     axs[x, y].set_title('ch' + str(ch_id) )
-
+    if ch_id <4:
+        dt_ch_top_sim[ch_id] = peaks[1] * step
+    else:
+        dt_ch_b_sim[ch_id-4] = peaks[1] * step
+dt_ch_sim = dt_ch_top_sim - dt_ch_b_sim
 plt.show()
 
-# compare with the spice core data
+#compare with the spice core data
 # fig, axs = plt.subplots(2, 4)
-# dt=pd.read_csv('/Users/alisanozdrina/Documents/phys/exp/ara/ara2_ml/dev/dt_DnR.csv')
 # for ch_id in range(0,8):
 #     y = ch_id % 4
 #     x = (ch_id)//4
-#     dt.iloc[ch_id]
-#     axs[x, y].hist( dt.iloc[ch_id] [dt.iloc[ch_id] > 100 ] )
-#     axs[x, y].axvline(dt_DnR_sim[ch_id], color='k', linestyle='dashed', linewidth=1)
+#     dt_DnR_spice = ( get_spiceCore_DnR(ch_id) [1] - get_spiceCore_DnR(ch_id) [0] )
+#     #axs[x, y].axvline(dt_DnR_spice, color='r')
+#     axs[x, y].axvline(dt_DnR_spice - dt_DnR_sim[ch_id], color='k', linestyle='dashed', linewidth=1)
 #     min_ylim, max_ylim = axs[x, y].get_ylim()
 #     #plt.text(dt_DnR_sim[ch_id] * 1.1, max_ylim * 0.9, 'sim'.format(dt_DnR_sim[ch_id]))
 #     axs[x, y].set_title('ch' + str(ch_id))
-#
+
 # plt.show()
+
+# timing diagnostic plots
+dt_DnR = np.zeros(8)
+for ch_id in range(0,8):
+    dt_DnR_spice = get_spiceCore_DnR(ch_id)[1] - get_spiceCore_DnR(ch_id)[0]
+    dt_DnR[ch_id] = dt_DnR_spice - dt_DnR_sim[ch_id]
+figure, axis = plt.subplots(2, 1)
+figure.tight_layout()
+#ax = fig.add_axes([0,0,1,1])
+ch_n = np.arange(0,8,1)
+axis[0].bar(ch_n, -dt_DnR, color = 'b', width = 0.25, label = 'dt direct & reflected')
+axis[0].legend()
+axis[0].set_title('CATH sim vs Spice Core A2 data')
+axis[0].set(xlabel='channel number',ylabel= 'dt, ns')
+axis[0].grid()
+#plt.show()
+
+dt_ch = np.zeros(4)
+for ch_id in range(0,4):
+    dt_ch_spice = (get_spiceCore_DnR(ch_id)[1] + get_channel_delay(ch_id)) -\
+                  (get_spiceCore_DnR(ch_id+4)[1] +get_channel_delay(ch_id+4))
+    dt_ch[ch_id] = dt_ch_spice - dt_ch_sim[ch_id]
+
+#ax = fig.add_axes([0,0,1,1])
+ch_n = np.arange(0,4,1)
+axis[1].bar(ch_n, -dt_ch, color = 'b', width = 0.25, label = 'dt top and bottom ch')
+axis[1].legend()
+axis[1].set_title('CATH sim vs Spice Core A2 data')
+axis[1].set(xlabel='string number',ylabel= 'dt, ns')
+axis[1].grid()
+plt.show()
+
