@@ -1,30 +1,10 @@
-from NuRadioReco.modules import channelBandPassFilter
+
 from NuRadioReco.detector import detector
 import datetime
-from NuRadioReco.modules import sphericalWaveFitter
-from NuRadioReco.modules import channelAddCableDelay
-from NuRadioReco.modules.io.rno_g import rnogDataReader
-from NuRadioReco.utilities import units
-from NuRadioReco.framework.base_trace import BaseTrace
-from NuRadioReco.framework.channel import Channel
 from NuRadioReco.detector import antennapattern
-from NuRadioMC.SignalGen import emitter
-from NuRadioMC.utilities import medium
-from NuRadioReco.modules.RNO_G.hardwareResponseIncorporator import hardwareResponseIncorporator
 from NuRadioReco.detector.RNO_G import analog_components
-import uproot
-from scipy import constants
-import pandas as pd
-import matplotlib.pyplot as plt
-import glob
-import json
 import numpy as np
-import scipy.constants
-import NuRadioReco
-from NuRadioReco.utilities import units, fft
 from radiotools import helper as hp
-from NuRadioReco.utilities import geometryUtilities as geo_utl
-
 
 class IC_hybrid_station:  # matching description with hybrid station from gen2 proposal
     # The reference design that we use throughout this document combines shallow and hy-
@@ -46,7 +26,7 @@ class IC_hybrid_station:  # matching description with hybrid station from gen2 p
     det = detector.Detector(
         json_filename='/Users/alisanozdrina/Documents/phys/exp/rno/soft/NuRadioMC/NuRadioReco/detector/RNO_G/RNO_single_station.json')  # detector file
     det.update(datetime.datetime(2018, 10, 1))
-    amp_response_surface = analog_components.load_amp_response('rno_surface')
+    amp_response_surface = analog_components.load_amp_response('rno_surface', temp=220)
     amp_response_iglu = analog_components.load_amp_response('iglu')
 
     def __init__(self, name='', coordinates=np.array([0, 0, 0])):
@@ -74,28 +54,28 @@ class IC_hybrid_station:  # matching description with hybrid station from gen2 p
         # vpols
         # phased array
         ch_coord[7] = np.array([center[x], center[y] + 20, -10])
-        ch_coord[8] = np.array([center[x], center[y] + 20, -40])
-        ch_coord[9] = np.array([center[x], center[y] + 20, -60])
-        ch_coord[10] = np.array([center[x], center[y] + 20, -144])
-        ch_coord[11] = np.array([center[x], center[y] + 20, -146])
-        ch_coord[12] = np.array([center[x], center[y] + 20, -148])
+        ch_coord[8] = np.array([center[x], center[y] + 20, -55])
+        ch_coord[9] = np.array([center[x], center[y] + 20, -100])
+        ch_coord[10] = np.array([center[x], center[y] + 20, -147])
+        ch_coord[11] = np.array([center[x], center[y] + 20, -148])
+        ch_coord[12] = np.array([center[x], center[y] + 20, -149])
         ch_coord[13] = np.array([center[x], center[y] + 20, -150])
         # helper string 1
-        ch_coord[14] = np.array([center[x] + 17.3, center[y] - 10, -146])
-        ch_coord[15] = np.array([center[x] + 17.3, center[y] - 10, -150])
+        ch_coord[14] = np.array([center[x] + 17.3, center[y] - 10, -148])
+        ch_coord[15] = np.array([center[x] + 17.3, center[y] - 10, -149])
         # helper string 2
-        ch_coord[16] = np.array([center[x] - 17.3, center[y] - 10, -146])
-        ch_coord[17] = np.array([center[x] - 17.3, center[y] - 10, -150])
+        ch_coord[16] = np.array([center[x] - 17.3, center[y] - 10, -148])
+        ch_coord[17] = np.array([center[x] - 17.3, center[y] - 10, -149])
         # h pols
         # phased array
-        ch_coord[18] = np.array([center[x], center[y] + 20, -142])
-        ch_coord[19] = np.array([center[x], center[y] + 20, -150])
+        ch_coord[18] = np.array([center[x], center[y] + 20, -145])
+        ch_coord[19] = np.array([center[x], center[y] + 20, -146])
         # helper string 1
-        ch_coord[20] = np.array([center[x] + 17.3, center[y] - 10, -144])
-        ch_coord[21] = np.array([center[x] + 17.3, center[y] - 10, -148])
+        ch_coord[20] = np.array([center[x] + 17.3, center[y] - 10, -147])
+        ch_coord[21] = np.array([center[x] + 17.3, center[y] - 10, -149])
         # helper string 2
-        ch_coord[22] = np.array([center[x] - 17.3, center[y] - 10, -144])
-        ch_coord[23] = np.array([center[x] - 17.3, center[y] - 10, -148])
+        ch_coord[22] = np.array([center[x] - 17.3, center[y] - 10, -147])
+        ch_coord[23] = np.array([center[x] - 17.3, center[y] - 10, -149])
         return ch_coord
 
     def getnIceVpol_orientation_rotation(self):

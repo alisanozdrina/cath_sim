@@ -48,7 +48,7 @@ for ch_id in [0,4]:
         # necessary if we are not working in the y=0 plane
         launch_vector = rays.get_launch_vector(i_solution)
         phi = np.arctan(launch_vector[1]/launch_vector[0])
-        plt.plot(path[:,0]/np.cos(phi), path[:,2], label=str(ch_id) + solution_type)
+        plt.plot(path[:,0]/np.cos(phi), path[:,2], label= 'channel ' + str(ch_id)  + " " + solution_type + ' ray')
 
         # We can also get the 3D receiving vector at the observer position, for instance
         receive_vector = rays.get_receive_vector(i_solution)
@@ -61,5 +61,6 @@ plt.xlabel('horizontal coordinate [m]')
 plt.ylabel('vertical coordinate [m]')
 
 plt.legend()
+
 plt.show()
 

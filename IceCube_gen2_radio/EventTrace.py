@@ -8,10 +8,14 @@ class EventTrace:
         self.station_name = station_name
         self._sampling_rate = 3.2e9  # 3.2 GHz similar to RNO-g
         self._trace_length = 2048  # samples - corresponds to 640 ns trace length
-        self._num_of_ch = 16
+        self._num_of_ch = 24
         self.traces = [np.array([]) for i in range(self._num_of_ch)]
         self.fft_traces = [np.array([]) for i in range(self._num_of_ch)]
+        self.hit_time = np.zeros(self._num_of_ch)
 
+    def set_hit_time(self, index, hit_time):
+        # hit_time [ns]
+        self.hit_time[index] = hit_time
     def set_trace(self, index, trace, samp_rate=2.5, start_time=0):
         # if start_time!=0:
         # 	dt = 1/samp_rate

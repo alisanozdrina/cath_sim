@@ -42,8 +42,23 @@ def cable_attenuation(inputFreqRange, cable_length=300):
     # attenuation given per 100 m
 
     return 1 / ((pow(10, att_dBp100m_interpolated / 10)))
+def rg213_cable_att(inputFreqRange, cable_length=300):
 
+    # cable_length  [m]
+    # https://www.universal-radio.com/catalog/cable/coaxperf.html
+    att_dBp100feet = np.array([1.5,2.1,2.8, 2.8 ,5.1 ,5.1, 8.2]) * (cable_length*3.28084 / 100)
+    freqGHz = np.array([50 ,100, 146 ,150, 440, 450, 1000]) * 1e-3
+    #freqGHz = np.array([50, 150, 220, 450, 900, 1500]) * 1e-3
+    #att_dBp100m = np.array([1.8, 3.2, 3.9, 5.6, 8.2, 10.9]) * cable_length / 100
 
+    freqGHz_interpolated = inputFreqRange
+    att_dBp100m_interpolated = np.interp(freqGHz_interpolated, freqGHz, att_dBp100feet)
+
+    # convert attenuation from db to voltage ratio
+    # P = P0 / 10^(Lp dB/10 dB)
+    # attenuation given per 100 m
+
+    return 1 / ((pow(10, att_dBp100m_interpolated / 10)))
 def fiber_link(inputFreqRange, cable_length=300):
     # cable_length  [m]
     # using lmr-600 cable for reference
@@ -306,7 +321,7 @@ def plot_surface_array(array_of_st, cath_site, Event):
 
 
 def drawTraceDeepChannels(station_name, event_id, traceVoltage, trace_sampling_rate, sampling_rate, num_of_samples):
-    # https://radio.uchicago.edu/wiki/images/a/aa/Channel-mapping-sideview-v3.pdf
+    # https://radio.uchicago.edu/wiki/images//aa/Channel-mapping-sideview-v3.pdf
     plt.rcParams["figure.figsize"] = (15, 8)
 
     fig, axs = plt.subplots(nrows=9, ncols=3, sharex=True, sharey=True)
@@ -314,7 +329,7 @@ def drawTraceDeepChannels(station_name, event_id, traceVoltage, trace_sampling_r
     station_id = station_name
     eventID = event_id
 
-    fig.suptitle('Station ' + str(station_id) + ' event ' + str(eventID) + ', Deep antennas', fontsize=18)
+    fig.suptitle('Station ' + str(station_id) + ' event ' + str(eventID) + ', Deep antennas \n Tx at -350 m depth' , fontsize=18)
 
     # power string  row = 0 ch 7,6,5,4,8,3,2,1,0
 
@@ -404,25 +419,14 @@ def drawTraceDeepChannels(station_name, event_id, traceVoltage, trace_sampling_r
     axs[7][2].text(0.9, 0.7, 'H pol', horizontalalignment='center', verticalalignment='center',
                    transform=axs[7][2].transAxes, fontsize=18, c='r')
 
-    fig.text(0.09, 0.5, 'Amplitude, [mV]', ha='center', va='center', rotation='vertical', fontsize=18)
-    fig.text(0.5, 0.05, 'time from arbitary moment, [ns]', ha='center', va='center', fontsize=18)
+    fig.text(0.09, 0.5, 'Amplitude, [V]', ha='center', va='center', rotation='vertical', fontsize=18)
+    fig.text(0.5, 0.05, 'time from the arbitrary moment, [ns]', ha='center', va='center', fontsize=18)
 
     plt.show()
 
 
 def superimposeWF(WF, t_shift, sampling_rate=3.2):
-    # trace_base = np.zeros(2048)
-    # for n in range(0, len(WF)):
-    #     trace = WF[n]
-    #     shift = delta_t[n]
-    #     for i in range(0, len(trace)):
-    #         it = int(shift+i)
-    #         if (it >= len(trace_base)):
-    #             #time window is to small, cut the trace
-    #             break
-    #         else:
-    #             trace_base[it] += trace[i]
-    # return trace_base
+
     trace_base = np.zeros(2048)
     shift_inSamples = int(t_shift * sampling_rate)
     for i in range(0, len(WF[0])):
@@ -492,3 +496,39 @@ def get_channel_delay (ch_id):
                        1.28149923e+01,  1.22823466e+01, -9.33794532e+01,  9.56549035e+00,
                        -6.10678246e+01, -6.15181106e+01, -1.67215309e+02, -6.42134005e+01])
     return delay[ch_id]
+
+
+def convertAGlobal_from2A2Local(vec):
+    t_vec_ARA2 = np.array([-8519.62, 13126.70, -18.72])
+    # t_vec_ARA2=np.array([-8517.99868766, 13127.99868766,    39.62 ])
+    t_vec_ARA2 *= 0.3048
+    rot_matrix = np.array([[-0.598647, 0.801013, -0.000970507],
+                           [-0.801007, -0.598646, -0.00316072],
+                           [-0.00311277, -0.00111477, 0.99995]])
+    inverse_rot_matrix = np.linalg.inv(rot_matrix)
+
+    return np.dot(inverse_rot_matrix, vec) + t_vec_ARA2
+
+
+def get_RVEL(antenna_type,freq_axis, E_zenith, E_azimuth=0, LPDA_ori_zenith=np.pi/2, LPDA_ori_azmuth=0, LPDA_rot_zenith=np.pi/2, LPDA_rot_azimuth=-np.pi/2):
+    # freq_axis must be in Hz
+    path_to_file = '/Users/alisanozdrina/Documents/phys/exp/icecube_gen2/cal_tower/sim/cath_site/BeamPatternReco'
+    if antenna_type == 'LPDA':
+        RVEL_complex_theta = np.loadtxt(path_to_file+'/lpda_RVEL_theta.txt').view(complex)
+        RVEL_complex_phi = np.loadtxt(path_to_file + '/lpda_RVEL_phi.txt').view(complex)
+    if antenna_type == 'PVA':
+        RVEL_complex_theta = np.loadtxt(path_to_file + '/pva_RVEL_theta_n1.78.txt').view(complex)
+        RVEL_complex_phi = np.loadtxt(path_to_file + '/pva_RVEL_phi_n1.78.txt').view(complex)
+    if antenna_type == 'ARA_Vpol':
+        RVEL_complex_theta = np.loadtxt(path_to_file + '/ARAVpol_RVEL_theta_n1.78.txt').view(complex)
+        RVEL_complex_phi = np.loadtxt(path_to_file + '/ARAVpol_RVEL_phi_n1.78.txt').view(complex)
+
+    freq_RVEL = np.arange(50000000.0, 1001187500.0, 1187500.0)
+    freq_RVEL = freq_RVEL *1e-9
+    RVEL_complex_interpolated_theta = np.interp(freq_axis, freq_RVEL, RVEL_complex_theta)
+    #RVEL_complex_interpolated_theta *= np.cos (E_zenith)
+    RVEL_complex_interpolated_phi = np.interp(freq_axis, freq_RVEL, RVEL_complex_phi)
+
+    RVEL = {'theta':RVEL_complex_interpolated_theta, 'phi':RVEL_complex_interpolated_phi}
+    return RVEL
+

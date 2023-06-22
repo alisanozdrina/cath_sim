@@ -14,7 +14,7 @@ from scipy import constants
 from scipy.signal import find_peaks,peak_widths,peak_prominences
 from NuRadioReco.detector.ARA.analog_components import get_system_response
 import matplotlib.pyplot as plt
-
+import pandas as pd
 import pandas as pd
 
 #################
@@ -25,7 +25,7 @@ import pandas as pd
 # Spice Core coordinates taken from https://aradocs.wipac.wisc.edu/0025/002565/002/SPICE%20coordinates.pdf
 # 48.832 ft N, 42.455 ft E i.e. 14883.994 m N, 12940.284 m E
 ################
-c = constants.c #m/sec
+c = constants.c * units.m / units.s #m/sec
 n_firn = 1.3
 
 prop = propagation.get_propagation_module('analytic')
@@ -82,8 +82,11 @@ for ch_id in range(0,8):
 
             zenith_emitter, azimuth_emitter = hp.cartesian_to_spherical(*launch_vector)
 
-            VEL = spunk_antenna.get_antenna_response_vectorized(freq_range, zenith_emitter, azimuth_emitter,
-                                                                        *spunk_antenna_orientation)
+            #VEL = spunk_antenna.get_antenna_response_vectorized(freq_range, zenith_emitter, azimuth_emitter,
+            #                                                            *spunk_antenna_orientation)
+
+            VEL = get_RVEL('PVA',freq_range, zenith_emitter, azimuth_emitter, *spunk_antenna_orientation)
+
             n_index = ice.get_index_of_refraction(Tx_location)
 
             eTheta = VEL['theta'] * (-1j) * spunk.get_pulse_fft() * freq_range * n_index / c
@@ -102,7 +105,9 @@ for ch_id in range(0,8):
             rx_antenna_orientation = ara2.getAntOrientationRotation(ch_id)
 
             VEL = rx_antenna.get_antenna_response_vectorized(freq_range, zenith_Rx, azimuth_Rx,
-                                                                *rx_antenna_orientation)
+                                                               *rx_antenna_orientation)
+
+            # VEL = get_RVEL('ARA_Vpol', freq_range,  zenith_Rx, azimuth_Rx, *rx_antenna_orientation)
 
             pwr_spectrum_rx = np.array([VEL['theta'], VEL['phi']]) * np.array([eTheta, ePhi])
 
@@ -115,6 +120,7 @@ for ch_id in range(0,8):
 
             WF[i_solution] = fft.freq2time(pwr_spectrum_rx, 2*np.max(freq_range))
             # bandpass filter
+
             WF[i_solution] = butter_bandpass_filter(WF[i_solution], 0.15, 0.85, sampling_rate_ara1, order=4)
 
         WF_dnR = superimposeWF(WF, dt_DnR, sampling_rate_ara1)
@@ -134,19 +140,71 @@ dt_ch_top_sim = np.zeros(4)
 dt_ch_b_sim = np.zeros(4)
 
 #x,y row, column
+
+def converter(instr):
+    return np.fromstring(instr[1:-1],sep=' ')
+df = pd.read_csv('/Users/alisanozdrina/Documents/phys/exp/ara/ara2_ml/dev/spice_WF.csv', sep=';', converters={'time axis, ns':converter,'voltage, V':converter})
+
 for ch_id in range(0,8):
     y = ch_id % 4
     x = (ch_id)//4
-    peaks= find_peak_start(Event.get_trace(ch_id), 0.25e-10, distance=100)
+    peaks= find_peak_start(Event.get_trace(ch_id), 0.02, distance=100)
     dt_DnR_sim[ch_id] = (peaks[1] - peaks[0]) * step
+    axs[x, y].plot(df.iloc[ch_id]['time axis, ns'], df.iloc[ch_id]['voltage, V']*1e-3, alpha = 0.4)
+    axs[x, y].plot(time_axis-100,Event.get_trace(ch_id))
 
-    axs[x, y].plot(time_axis,Event.get_trace(ch_id))
     axs[x, y].set_title('ch' + str(ch_id) )
     if ch_id <4:
         dt_ch_top_sim[ch_id] = peaks[1] * step
     else:
         dt_ch_b_sim[ch_id-4] = peaks[1] * step
 dt_ch_sim = dt_ch_top_sim - dt_ch_b_sim
+
+fig.suptitle('ARA2 Spice Core Run 12558, Loop iter:46031 Event # 12 \n vs CATH SIM ', fontsize=18)
+
+fig.text(0.05, 0.5, 'Amplitude, [V]', ha='center', va='center', rotation='vertical', fontsize=18)
+fig.text(0.5, 0.05, 'Time, [ns]', ha='center', va='center', fontsize=18)
+
+plt.show()
+
+fig, axs = plt.subplots(2, 4)
+for ch_id in range(0,8):
+    y = ch_id % 4
+    x = (ch_id)//4
+    peaks= find_peak_start(Event.get_trace(ch_id), 0.02, distance=100)
+    dt_DnR_sim[ch_id] = (peaks[1] - peaks[0]) * step
+
+    #axs[x, y].plot(df.iloc[ch_id]['time axis, ns'], df.iloc[ch_id]['voltage, V']*1e-3, alpha = 0.4)
+    #axs[x, y].plot(time_axis-100,Event.get_trace(ch_id))
+
+    N = len(df.iloc[ch_id]['voltage, V']*1e-3)
+    dt = df.iloc[ch_id]['time axis, ns'][1] - df.iloc[ch_id]['time axis, ns'][0]  # ns
+    sampling_rate = 1 / dt  # GHz
+    freq_axis = np.fft.rfftfreq(N, dt)
+    fft_spice = fft.time2freq(df.iloc[ch_id]['voltage, V']*1e-3, sampling_rate)
+    axs[x, y].plot(freq_axis,20*np.log(abs(fft_spice)), alpha = 0.4)
+
+    N = len(Event.get_trace(ch_id))
+    dt = time_axis[1] - time_axis[0]  # ns
+    sampling_rate = 1 / dt  # GHz
+    freq_axis = np.fft.rfftfreq(N, dt)
+    fft_sim = fft.time2freq(Event.get_trace(ch_id), sampling_rate)
+    axs[x, y].plot(freq_axis,20*np.log(abs(fft_sim)))
+
+    axs[x, y].set_ylim(-150, 50)
+    axs[x, y].set_xlim(0.05, 1)
+    axs[x, y].set_title('ch' + str(ch_id) )
+    if ch_id <4:
+        dt_ch_top_sim[ch_id] = peaks[1] * step
+    else:
+        dt_ch_b_sim[ch_id-4] = peaks[1] * step
+dt_ch_sim = dt_ch_top_sim - dt_ch_b_sim
+
+fig.suptitle('ARA2 Spice Core Run 12558, Loop iter:46031 Event # 12 \n vs CATH SIM ', fontsize=18)
+
+fig.text(0.05, 0.5, 'FFT, 20log10(V)', ha='center', va='center', rotation='vertical', fontsize=18)
+fig.text(0.5, 0.05, 'Frequency, [GHz]', ha='center', va='center', fontsize=18)
+
 plt.show()
 
 #compare with the spice core data
@@ -164,33 +222,34 @@ plt.show()
 # plt.show()
 
 # timing diagnostic plots
-dt_DnR = np.zeros(8)
-for ch_id in range(0,8):
-    dt_DnR_spice = get_spiceCore_DnR(ch_id)[1] - get_spiceCore_DnR(ch_id)[0]
-    dt_DnR[ch_id] = dt_DnR_spice - dt_DnR_sim[ch_id]
-figure, axis = plt.subplots(2, 1)
-figure.tight_layout()
-#ax = fig.add_axes([0,0,1,1])
-ch_n = np.arange(0,8,1)
-axis[0].bar(ch_n, -dt_DnR, color = 'b', width = 0.25, label = 'dt direct & reflected')
-axis[0].legend()
-axis[0].set_title('CATH sim vs Spice Core A2 data')
-axis[0].set(xlabel='channel number',ylabel= 'dt, ns')
-axis[0].grid()
+#
+# dt_DnR = np.zeros(8)
+# for ch_id in range(0,8):
+#     dt_DnR_spice = get_spiceCore_DnR(ch_id)[1] - get_spiceCore_DnR(ch_id)[0]
+#     dt_DnR[ch_id] = dt_DnR_spice - dt_DnR_sim[ch_id]
+# figure, axis = plt.subplots(2, 1)
+# figure.tight_layout()
+#
+# ch_n = np.arange(0,8,1)
+# axis[0].bar(ch_n, -dt_DnR, color = 'b', width = 0.25, label = 'dt direct & reflected')
+# axis[0].legend()
+# axis[0].set_title('CATH sim vs Spice Core A2 data')
+# axis[0].set(xlabel='channel number',ylabel= 'dt, ns')
+# axis[0].grid()
 #plt.show()
 
-dt_ch = np.zeros(4)
-for ch_id in range(0,4):
-    dt_ch_spice = (get_spiceCore_DnR(ch_id)[1] + get_channel_delay(ch_id)) -\
-                  (get_spiceCore_DnR(ch_id+4)[1] +get_channel_delay(ch_id+4))
-    dt_ch[ch_id] = dt_ch_spice - dt_ch_sim[ch_id]
-
-#ax = fig.add_axes([0,0,1,1])
-ch_n = np.arange(0,4,1)
-axis[1].bar(ch_n, -dt_ch, color = 'b', width = 0.25, label = 'dt top and bottom ch')
-axis[1].legend()
-axis[1].set_title('CATH sim vs Spice Core A2 data')
-axis[1].set(xlabel='string number',ylabel= 'dt, ns')
-axis[1].grid()
-plt.show()
+# dt_ch = np.zeros(4)
+# for ch_id in range(0,4):
+#     dt_ch_spice = (get_spiceCore_DnR(ch_id)[1] + get_channel_delay(ch_id)) -\
+#                   (get_spiceCore_DnR(ch_id+4)[1] +get_channel_delay(ch_id+4))
+#     dt_ch[ch_id] = dt_ch_spice - dt_ch_sim[ch_id]
+#
+# #ax = fig.add_axes([0,0,1,1])
+# ch_n = np.arange(0,4,1)
+# axis[1].bar(ch_n, -dt_ch, color = 'b', width = 0.25, label = 'dt top and bottom ch')
+# axis[1].legend()
+# axis[1].set_title('CATH sim vs Spice Core A2 data')
+# axis[1].set(xlabel='string number',ylabel= 'dt, ns')
+# axis[1].grid()
+# plt.show()
 
