@@ -3,7 +3,7 @@ from IceCube_gen2_radio.tools import *
 import scipy
 from IceCube_gen2_radio.CATH import CATH
 from IceCube_gen2_radio.EventTrace import EventTrace
-
+from IceCube_gen2_radio.noise import *
 # define ice parameters
 n_index = 1
 c = constants.c * units.m / units.s
@@ -215,19 +215,33 @@ for st_id in range(0, Num_of_stations):
                 #Fold E-field with in ice Rx antennas
                 power_spectrum_atRx = efield_antenna_factor * np.array([eTheta, ePhi])
                 power_spectrum_atRx = np.sum(power_spectrum_atRx, axis=0) * attenuation_ice
+                # Add thermal noise
+                thermal_noise_spectrum = generate_thermal_noise(freq_range, depth = -final_point[2])
+
+                #power_spectrum_atRx += thermal_noise_spectrum
                 # apply amplifier
                 amplifier_s11 = array_of_st[st_id].amp_response_iglu
                 amp_response = amplifier_s11['gain'](freq_range) * amplifier_s11['phase'](freq_range)
+                # Add Amplifier noise
+                ampl_noise =  get_noise_figure_IGLU_DRAP(freq_range)
+                #power_spectrum_atRx += ampl_noise
                 # Fiber Link passes signal to the DAQ
-                power_spectrum_atRx = power_spectrum_atRx * amp_response * fiber_link(freq_range,
-                                                                                             -final_point[2])
+                power_spectrum_atRx *= amp_response * fiber_link(freq_range, -final_point[2])
+                thermal_noise_spectrum *= amp_response * fiber_link(freq_range, -final_point[2])
+                ampl_noise *= amp_response * fiber_link(freq_range, -final_point[2])
+
                 # fold signal with receiving antenna response
                 WF[iS] = fft.freq2time(power_spectrum_atRx,
                                        sampling_rate_for_IFFT)  # sampling rate is twice the length of original pulse freq band..
+                # thermal_noise = fft.freq2time(thermal_noise_spectrum, sampling_rate_for_IFFT)
+                # WF[iS] += thermal_noise
             # Superimpose direct and reflected rays
             WF_DnR_superimposed = superimposeWF(WF, dt_DnR)
             # Shift traces in time with respect to trigger time
             WF_superimposed_shifted = shift_trace(WF_DnR_superimposed, dt_channel, sampling_rate_for_IFFT)
+            WF_noise = fft.freq2time(thermal_noise_spectrum, sampling_rate_for_IFFT) + fft.freq2time(ampl_noise, sampling_rate_for_IFFT)
+            # plt.plot(WF_noise)
+            # plt.show()
             Event[ev_id].set_trace( ch_id, WF_superimposed_shifted)
 
 
